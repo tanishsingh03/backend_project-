@@ -1,5 +1,5 @@
 const express = require("express");
-const cors = require("cors");
+//const cors = require("cors");
 const dotenv = require("dotenv");
 const { PrismaClient } = require("./generated/prisma");
 const jwt = require("jsonwebtoken");
@@ -8,7 +8,7 @@ dotenv.config();
 const prisma = new PrismaClient();
 const app = express();
 
-app.use(cors());
+//app.use(cors());
 app.use(express.json());
 
 // Health check
@@ -91,30 +91,63 @@ app.post("/login/:role", async (req, res) => {
 // ----------------------
 // Create Order (Customer only)
 // ----------------------
+// app.post("/orders", authenticate, async (req, res) => {
+//   if (req.user.role !== "user") return res.status(403).json({ message: "Forbidden" });
+
+//   const { restaurantId, items } = req.body; // items = [{ menuItemId, quantity }]
+//   try {
+//     // calculate total
+//     let totalPrice = 0;
+//     for (let item of items) {
+//       const menu = await prisma.menuItem.findUnique({ where: { id: item.menuItemId } });
+//       if (!menu) return res.status(400).json({ message: "Menu item not found" });
+//       totalPrice += menu.price * item.quantity;
+//     }
+
+//     const order = await prisma.order.create({
+//       data: {
+//         orderNumber: `ORD-${Date.now()}`,
+//         userId: req.user.id,
+//         restaurantId,
+//         totalPrice,
+//         items: {
+//           create: items.map((i) => ({ menuItemId: i.menuItemId, quantity: i.quantity })),
+//         },
+//       },
+//       include: { items: true },
+//     });
+
+//     res.json({ message: "Order created", order });
+//   } catch (err) {
+//     res.status(400).json({ message: err.message });
+//   }
+// });
 app.post("/orders", authenticate, async (req, res) => {
   if (req.user.role !== "user") return res.status(403).json({ message: "Forbidden" });
 
   const { restaurantId, items } = req.body; // items = [{ menuItemId, quantity }]
   try {
-    // calculate total
     let totalPrice = 0;
+
+    // Validate menu items belong to the restaurant
     for (let item of items) {
       const menu = await prisma.menuItem.findUnique({ where: { id: item.menuItemId } });
-      if (!menu) return res.status(400).json({ message: "Menu item not found" });
+      if (!menu) return res.status(400).json({ message: `Menu item not found: ${item.menuItemId}` });
+      if (menu.restaurantId !== restaurantId)
+        return res.status(400).json({ message: `Menu item ${menu.name} does not belong to this restaurant` });
       totalPrice += menu.price * item.quantity;
     }
 
+    // Create order
     const order = await prisma.order.create({
       data: {
         orderNumber: `ORD-${Date.now()}`,
         userId: req.user.id,
         restaurantId,
         totalPrice,
-        items: {
-          create: items.map((i) => ({ menuItemId: i.menuItemId, quantity: i.quantity })),
-        },
+        items: { create: items.map(i => ({ menuItemId: i.menuItemId, quantity: i.quantity })) },
       },
-      include: { items: true },
+      include: { items: { include: { menuItem: true } } },
     });
 
     res.json({ message: "Order created", order });
@@ -122,6 +155,7 @@ app.post("/orders", authenticate, async (req, res) => {
     res.status(400).json({ message: err.message });
   }
 });
+
 
 // ----------------------
 // Get Orders for Restaurant
@@ -140,15 +174,32 @@ app.get("/restaurant/orders", authenticate, async (req, res) => {
 // ----------------------
 // Get Orders for Customer
 // ----------------------
-app.get("/user/orders", authenticate, async (req, res) => {
-  if (req.user.role !== "user") return res.status(403).json({ message: "Forbidden" });
+// app.get("/user/orders", authenticate, async (req, res) => {
+//   if (req.user.role !== "user") return res.status(403).json({ message: "Forbidden" });
 
-  const orders = await prisma.order.findMany({
-    where: { userId: req.user.id },
-    include: { items: { include: { menuItem: true } }, restaurant: true },
-  });
+//   const orders = await prisma.order.findMany({
+//     where: { userId: req.user.id },
+//     include: { items: { include: { menuItem: true } }, restaurant: true },
+//   });
 
-  res.json({ orders });
+//   res.json({ orders });
+// });
+app.get("/user/:id/orders", authenticate, async (req, res) => {
+  const { id } = req.params;
+
+  // Only admin or restaurant can access (optional: add role check)
+  // if (req.user.role !== "admin" && req.user.role !== "restaurant") return res.status(403).json({ message: "Forbidden" });
+
+  try {
+    const orders = await prisma.order.findMany({
+      where: { userId: parseInt(id) },
+      include: { items: { include: { menuItem: true } }, restaurant: true },
+    });
+
+    res.json({ orders });
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
 });
 
 
