@@ -3,7 +3,8 @@
 // --------------------------
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const prisma = require("../../lib/prisma");
+const { PrismaClient } = require("./generated/prisma");
+const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || "secret123";
 
 async function signup(req, res) {

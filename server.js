@@ -4,6 +4,10 @@
 const express = require("express");
 const dotenv = require("dotenv");
 dotenv.config();
+const { PrismaClient } = require("./generated/prisma");
+const prisma = new PrismaClient();
+
+
 
 const authRoutes = require("./modules/auth/auth.routes");
 const ordersRoutes = require("./modules/orders/orders.routes");
