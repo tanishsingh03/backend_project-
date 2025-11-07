@@ -2,8 +2,9 @@
 // FILE: modules/orders/orders.controller.js
 // --------------------------
 //const prisma = require("../../lib/prisma");
-const { PrismaClient } = require("../auth/generated/prisma");
-const prisma = new PrismaClient();
+// const { PrismaClient } = require("../auth/generated/prisma");
+// const prisma = new PrismaClient();
+const prisma = require("../../lib/prisma");
 
 async function createOrder(req, res) {
 if (req.user.role !== "user") return res.status(403).json({ message: "Forbidden" });
